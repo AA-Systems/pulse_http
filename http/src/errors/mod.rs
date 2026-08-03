@@ -7,3 +7,9 @@ pub enum ParseError {
     InvalidHeaderLine,
     EmptyHeaderName,
 }
+
+#[derive(Debug)]
+pub enum ReadHeadersError {
+    Closed,
+    BadRequest,
+}
