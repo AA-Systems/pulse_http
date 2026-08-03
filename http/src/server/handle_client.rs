@@ -1,4 +1,4 @@
-use tokio::net::TcpStream;
+use std::sync::Arc;
 
 use crate::{
     constants::{MAX_BODY_SIZE, MAX_REQUESTS_PER_CONNECTION},
@@ -7,10 +7,13 @@ use crate::{
         read_body::read_content_length_body, read_headers::read_headers,
         should_keep_alive::should_keep_alive,
     },
-    response::{bad_request_response::bad_request_response, ok_response::ok_response},
+    request::Request,
+    response::Response,
+    router::Router,
 };
+use tokio::net::TcpStream;
 
-pub async fn handle_client(mut stream: TcpStream) {
+pub async fn handle_client(mut stream: TcpStream, router: Arc<Router>) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
 
@@ -23,15 +26,13 @@ pub async fn handle_client(mut stream: TcpStream) {
             Ok(parsed) => parsed,
             Err(ReadHeadersError::Closed) => return,
             Err(ReadHeadersError::BadRequest) => {
-                bad_request_response(&mut stream).await;
+                Response::bad_request().write_to_stream(&mut stream).await;
                 return;
             }
         };
 
-        println!("{:#?}", headers);
-
         if headers.fields.contains_key("transfer-encoding") {
-            bad_request_response(&mut stream).await;
+            Response::bad_request().write_to_stream(&mut stream).await;
             return;
         }
 
@@ -39,7 +40,7 @@ pub async fn handle_client(mut stream: TcpStream) {
             Some(value) => match value.parse::<usize>() {
                 Ok(n) => n,
                 Err(_) => {
-                    bad_request_response(&mut stream).await;
+                    Response::bad_request().write_to_stream(&mut stream).await;
                     return;
                 }
             },
@@ -57,23 +58,31 @@ pub async fn handle_client(mut stream: TcpStream) {
         {
             Ok(result) => result,
             Err(_) => {
-                bad_request_response(&mut stream).await;
+                Response::bad_request().write_to_stream(&mut stream).await;
                 return;
             }
         };
 
-        println!(
-            "body ({} bytes): {:?}",
-            body.len(),
-            String::from_utf8_lossy(&body)
-        );
+        let mut request = match Request::from_headers(headers, body) {
+            Some(request) => request,
+            None => {
+                Response::bad_request().write_to_stream(&mut stream).await;
+                return;
+            }
+        };
 
-        ok_response(&mut stream).await;
+        let keep_alive = should_keep_alive(&request);
+
+        let response = match router.match_route(&mut request) {
+            Some(handler) => handler(request),
+            None => Response::not_found(),
+        };
+
+        response.write_to_stream(&mut stream).await;
         request_count += 1;
-
         buffer = leftover;
 
-        if !should_keep_alive(&headers) {
+        if !keep_alive {
             return;
         }
     }

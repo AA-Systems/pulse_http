@@ -1,7 +1,7 @@
-use crate::headers::Headers;
+use crate::request::Request;
 
-pub fn should_keep_alive(headers: &Headers) -> bool {
-    if let Some(connection) = headers.fields.get("connection") {
+pub fn should_keep_alive(request: &Request) -> bool {
+    if let Some(connection) = request.headers.get("connection") {
         let value = connection.to_ascii_lowercase();
         if value == "close" {
             return false;
@@ -11,5 +11,5 @@ pub fn should_keep_alive(headers: &Headers) -> bool {
         }
     }
 
-    headers.http_version == "HTTP/1.1"
+    request.http_version == "HTTP/1.1"
 }

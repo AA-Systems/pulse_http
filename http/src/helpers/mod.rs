@@ -4,4 +4,7 @@ pub mod parse_request_line;
 pub mod read_body;
 pub mod read_headers;
 pub mod read_with_timeout;
+pub mod reason_phrase;
 pub mod should_keep_alive;
+pub mod split_path_and_query;
+pub mod split_segments;
