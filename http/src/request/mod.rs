@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{headers::Headers, helpers::split_path_and_query::split_path_and_query};
+use crate::{headers::Headers, helpers::split_path_and_query::split_path_and_query, state::State};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Method {
@@ -43,10 +43,11 @@ pub struct Request {
     pub params: HashMap<String, String>,
     pub body: Vec<u8>,
     pub http_version: String,
+    pub state: State,
 }
 
 impl Request {
-    pub fn from_headers(headers: Headers, body: Vec<u8>) -> Option<Self> {
+    pub fn from_headers(headers: Headers, body: Vec<u8>, state: State) -> Option<Self> {
         let method = Method::parse(&headers.method)?;
         let (path, query) = split_path_and_query(&headers.path);
 
@@ -58,6 +59,7 @@ impl Request {
             params: HashMap::new(),
             body,
             http_version: headers.http_version,
+            state,
         })
     }
 }

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     constants::{MAX_BODY_SIZE, MAX_REQUESTS_PER_CONNECTION},
     errors::ReadHeadersError,
@@ -11,13 +9,16 @@ use crate::{
     request::Request,
     response::Response,
     router::Router,
+    state::State,
 };
+use std::sync::Arc;
 use tokio::net::TcpStream;
 
 pub async fn handle_client(
     mut stream: TcpStream,
     router: Arc<Router>,
     middlewares: Arc<Vec<Arc<dyn Middleware>>>,
+    state: Arc<State>,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -68,7 +69,7 @@ pub async fn handle_client(
             }
         };
 
-        let request = match Request::from_headers(headers, body) {
+        let request = match Request::from_headers(headers, body, (*state).clone()) {
             Some(request) => request,
             None => {
                 Response::bad_request().write_to_stream(&mut stream).await;
