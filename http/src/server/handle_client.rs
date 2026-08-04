@@ -7,13 +7,18 @@ use crate::{
         read_body::read_content_length_body, read_headers::read_headers,
         should_keep_alive::should_keep_alive,
     },
+    middleware::{Middleware, Next},
     request::Request,
     response::Response,
     router::Router,
 };
 use tokio::net::TcpStream;
 
-pub async fn handle_client(mut stream: TcpStream, router: Arc<Router>) {
+pub async fn handle_client(
+    mut stream: TcpStream,
+    router: Arc<Router>,
+    middlewares: Arc<Vec<Arc<dyn Middleware>>>,
+) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
 
@@ -63,7 +68,7 @@ pub async fn handle_client(mut stream: TcpStream, router: Arc<Router>) {
             }
         };
 
-        let mut request = match Request::from_headers(headers, body) {
+        let request = match Request::from_headers(headers, body) {
             Some(request) => request,
             None => {
                 Response::bad_request().write_to_stream(&mut stream).await;
@@ -73,10 +78,13 @@ pub async fn handle_client(mut stream: TcpStream, router: Arc<Router>) {
 
         let keep_alive = should_keep_alive(&request);
 
-        let response = match router.match_route(&mut request) {
-            Some(handler) => handler(request),
+        let router = Arc::clone(&router);
+        let endpoint = Arc::new(move |mut req: Request| match router.match_route(&mut req) {
+            Some(handler) => handler(req),
             None => Response::not_found(),
-        };
+        });
+
+        let response = Next::new(Arc::clone(&middlewares), endpoint).run(request);
 
         response.write_to_stream(&mut stream).await;
         request_count += 1;

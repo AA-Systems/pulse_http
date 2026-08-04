@@ -2,6 +2,7 @@ pub mod constants;
 pub mod errors;
 pub mod headers;
 pub mod helpers;
+pub mod middleware;
 pub mod request;
 pub mod response;
 pub mod router;

@@ -4,8 +4,6 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::helpers::reason_phrase::reason_phrase;
 
-pub mod ok_response;
-
 pub struct Response {
     pub status: u16,
     pub headers: HashMap<String, String>,
@@ -47,6 +45,10 @@ impl Response {
 
     pub fn not_found() -> Self {
         Self::text(404, "Not found")
+    }
+
+    pub fn internal_server_error() -> Self {
+        Self::text(500, "Internal server error")
     }
 
     pub async fn write_to_stream(self, stream: &mut TcpStream) {

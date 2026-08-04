@@ -1,4 +1,8 @@
-use crate::{router::Router, server::handle_client::handle_client};
+use crate::{
+    middleware::{CatchPanic, Middleware, RequestId, RequestLogger},
+    router::Router,
+    server::handle_client::handle_client,
+};
 use std::sync::Arc;
 use tokio::{net::TcpListener, sync::Semaphore};
 
@@ -8,6 +12,7 @@ pub struct Server {
     pub listener: TcpListener,
     pub max_connections: u16,
     pub router: Router,
+    pub middlewares: Vec<Arc<dyn Middleware>>,
 }
 
 impl Server {
@@ -19,6 +24,11 @@ impl Server {
             ),
             max_connections: 2,
             router: Router::new(),
+            middlewares: vec![
+                Arc::new(RequestId),
+                Arc::new(RequestLogger),
+                Arc::new(CatchPanic),
+            ],
         }
     }
 
@@ -33,9 +43,15 @@ impl Server {
         Self { router, ..self }
     }
 
+    pub fn middleware(mut self, middleware: impl Middleware + 'static) -> Self {
+        self.middlewares.push(Arc::new(middleware));
+        self
+    }
+
     pub async fn serve(self) {
         let admission = Arc::new(Semaphore::new(self.max_connections as usize));
         let router = Arc::new(self.router);
+        let middlewares = Arc::new(self.middlewares);
 
         loop {
             let stream_result = self.listener.accept().await;
@@ -50,9 +66,10 @@ impl Server {
                         }
                     };
                     let router = Arc::clone(&router);
+                    let middlewares = Arc::clone(&middlewares);
                     tokio::spawn(async move {
                         let _permit = permit;
-                        handle_client(stream, router).await;
+                        handle_client(stream, router, middlewares).await;
                     });
                 }
                 Err(_error) => {}
