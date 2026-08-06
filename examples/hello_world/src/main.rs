@@ -1,6 +1,6 @@
 mod handlers;
 
-use handlers::{health::health, hello::hello};
+use handlers::{echo::echo, health::health, hello::hello};
 use http::{router::Router, server::Server};
 use std::io::Result;
 
@@ -8,7 +8,8 @@ use std::io::Result;
 async fn main() -> Result<()> {
     let router = Router::new()
         .get("/health", health)
-        .get("/hello/:name", hello);
+        .get("/hello/:name", hello)
+        .post("/echo", echo);
 
     Server::bind(String::from("127.0.0.1:3001"))
         .await

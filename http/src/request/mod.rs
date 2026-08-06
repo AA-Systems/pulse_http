@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
 use crate::{headers::Headers, helpers::split_path_and_query::split_path_and_query, state::State};
+use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Method {
@@ -61,5 +61,9 @@ impl Request {
             http_version: headers.http_version,
             state,
         })
+    }
+
+    pub fn json<T: DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
+        serde_json::from_slice(&self.body)
     }
 }

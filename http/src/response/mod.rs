@@ -1,4 +1,6 @@
 use crate::helpers::reason_phrase::reason_phrase;
+use serde::Serialize;
+use serde_json::to_vec;
 use std::collections::HashMap;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -24,6 +26,22 @@ impl Response {
         response
             .headers
             .insert("content-type".into(), "text/plain; charset=utf-8".into());
+
+        response
+            .headers
+            .insert("content-length".into(), body.len().to_string());
+
+        response.body = body;
+        response
+    }
+
+    pub fn json(status: u16, body: impl Serialize) -> Self {
+        let body = to_vec(&body).unwrap_or_default();
+        let mut response = Self::new(status);
+
+        response
+            .headers
+            .insert("content-type".into(), "application/json".into());
 
         response
             .headers
