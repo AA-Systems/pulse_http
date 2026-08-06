@@ -15,6 +15,7 @@ pub fn parse_request_line(line: &str) -> Result<(String, String, String), ParseE
         && method != "DELETE"
         && method != "PUT"
         && method != "HEAD"
+        && method != "OPTIONS"
     {
         return Err(ParseError::UnsupportedMethod);
     }

@@ -1,5 +1,5 @@
 use crate::{
-    middleware::{CatchPanic, Middleware, RequestId, RequestLogger},
+    middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders},
     router::Router,
     server::handle_client::handle_client,
     state::State,
@@ -29,6 +29,8 @@ impl Server {
             middlewares: vec![
                 Arc::new(RequestId),
                 Arc::new(RequestLogger),
+                Arc::new(Cors::new()),
+                Arc::new(SecurityHeaders),
                 Arc::new(CatchPanic),
             ],
             state: State::new(),

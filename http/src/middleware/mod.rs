@@ -6,12 +6,16 @@ use crate::{
 use std::sync::Arc;
 
 pub mod catch_panic;
+pub mod cors;
 pub mod logger;
 pub mod request_id;
+pub mod security_headers;
 
 pub use catch_panic::CatchPanic;
+pub use cors::Cors;
 pub use logger::RequestLogger;
 pub use request_id::RequestId;
+pub use security_headers::SecurityHeaders;
 
 pub trait Middleware: Send + Sync {
     fn handle(&self, request: Request, next: Next) -> BoxFuture<Response>;

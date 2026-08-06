@@ -9,6 +9,7 @@ pub enum Method {
     Put,
     Delete,
     Head,
+    Options,
 }
 
 impl Method {
@@ -19,6 +20,7 @@ impl Method {
             "PUT" => Some(Self::Put),
             "DELETE" => Some(Self::Delete),
             "HEAD" => Some(Self::Head),
+            "OPTIONS" => Some(Self::Options),
             _ => None,
         }
     }
@@ -30,6 +32,7 @@ impl Method {
             Self::Put => "PUT",
             Self::Delete => "DELETE",
             Self::Head => "HEAD",
+            Self::Options => "OPTIONS",
         }
     }
 }

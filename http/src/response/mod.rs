@@ -63,11 +63,34 @@ impl Response {
         Self::text(404, "Not found")
     }
 
+    pub fn no_content() -> Self {
+        let mut response = Self::new(204);
+        response.headers.insert("content-length".into(), "0".into());
+        response
+    }
+
     pub fn internal_server_error() -> Self {
         Self::text(500, "Internal server error")
     }
 
-    pub async fn write_to_stream(self, stream: &mut TcpStream) {
+    pub fn apply_security_headers(&mut self) {
+        self.headers
+            .entry("cache-control".into())
+            .or_insert_with(|| "no-store".into());
+        self.headers
+            .entry("referrer-policy".into())
+            .or_insert_with(|| "no-referrer".into());
+        self.headers
+            .entry("x-content-type-options".into())
+            .or_insert_with(|| "nosniff".into());
+        self.headers
+            .entry("x-frame-options".into())
+            .or_insert_with(|| "DENY".into());
+    }
+
+    pub async fn write_to_stream(mut self, stream: &mut TcpStream) {
+        self.apply_security_headers();
+
         let reason = reason_phrase(self.status);
         let mut output = format!("HTTP/1.1 {} {} \r\n", self.status, reason);
 
