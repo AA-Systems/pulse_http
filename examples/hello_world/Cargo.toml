@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 http = { path = "../../http" }
 serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros"] }
 tokio = "1.53.1"

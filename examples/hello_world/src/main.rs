@@ -2,20 +2,29 @@ mod handlers;
 
 use handlers::{echo::echo, health::health, hello::hello};
 use http::{router::Router, server::Server};
-use std::io::Result;
+use sqlx::postgres::PgPoolOptions;
+
+use crate::handlers::insert_user::insert_user;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    let database_url = "postgres://myuser:mysecretpassword@localhost:5432/mydatabase";
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await
+        .expect("failed to connect to postgres");
+
     let router = Router::new()
         .get("/health", health)
         .get("/hello/:name", hello)
-        .post("/echo", echo);
+        .post("/echo", echo)
+        .post("/insert_user", insert_user);
 
     Server::bind(String::from("127.0.0.1:3001"))
         .await
+        .state(pool)
         .router(router)
         .serve()
         .await;
-
-    Ok(())
 }
