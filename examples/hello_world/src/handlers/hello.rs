@@ -1,6 +1,6 @@
 use http::{request::Request, response::Response};
 
-pub fn hello(req: Request) -> Response {
+pub async fn hello(req: Request) -> Response {
     let name = req
         .params
         .get("name")

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     helpers::split_segments::split_segments,
@@ -6,7 +6,8 @@ use crate::{
     response::Response,
 };
 
-pub type Handler = Arc<dyn Fn(Request) -> Response + Send + Sync>;
+pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+pub type Handler = Arc<dyn Fn(Request) -> BoxFuture<Response> + Send + Sync>;
 
 #[derive(Default)]
 struct Node {
@@ -25,45 +26,45 @@ impl Router {
         Self::default()
     }
 
-    pub fn get(
-        self,
-        path: &str,
-        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
-    ) -> Self {
+    pub fn get<F, Fut>(self, path: &str, handler: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
         self.route(Method::Get, path, handler)
     }
 
-    pub fn post(
-        self,
-        path: &str,
-        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
-    ) -> Self {
+    pub fn post<F, Fut>(self, path: &str, handler: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
         self.route(Method::Post, path, handler)
     }
 
-    pub fn put(
-        self,
-        path: &str,
-        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
-    ) -> Self {
+    pub fn put<F, Fut>(self, path: &str, handler: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
         self.route(Method::Put, path, handler)
     }
 
-    pub fn delete(
-        self,
-        path: &str,
-        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
-    ) -> Self {
+    pub fn delete<F, Fut>(self, path: &str, handler: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
         self.route(Method::Delete, path, handler)
     }
 
-    pub fn route(
-        mut self,
-        method: Method,
-        path: &str,
-        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
-    ) -> Self {
-        self.insert(method, path, Arc::new(handler));
+    pub fn route<F, Fut>(mut self, method: Method, path: &str, handler: F) -> Self
+    where
+        F: Fn(Request) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Response> + Send + 'static,
+    {
+        let handler: Handler = Arc::new(move |request| Box::pin(handler(request)));
+        self.insert(method, path, handler);
         self
     }
 

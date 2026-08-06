@@ -82,10 +82,12 @@ pub async fn handle_client(
         let router = Arc::clone(&router);
         let endpoint = Arc::new(move |mut req: Request| match router.match_route(&mut req) {
             Some(handler) => handler(req),
-            None => Response::not_found(),
+            None => Box::pin(async { Response::not_found() }),
         });
 
-        let response = Next::new(Arc::clone(&middlewares), endpoint).run(request);
+        let response = Next::new(Arc::clone(&middlewares), endpoint)
+            .run(request)
+            .await;
 
         response.write_to_stream(&mut stream).await;
         request_count += 1;

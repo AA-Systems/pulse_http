@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
-use tokio::{io::AsyncWriteExt, net::TcpStream};
-
 use crate::helpers::reason_phrase::reason_phrase;
+use std::collections::HashMap;
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 pub struct Response {
     pub status: u16,

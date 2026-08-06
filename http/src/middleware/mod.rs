@@ -1,4 +1,8 @@
-use crate::{request::Request, response::Response, router::Handler};
+use crate::{
+    request::Request,
+    response::Response,
+    router::{BoxFuture, Handler},
+};
 use std::sync::Arc;
 
 pub mod catch_panic;
@@ -10,7 +14,7 @@ pub use logger::RequestLogger;
 pub use request_id::RequestId;
 
 pub trait Middleware: Send + Sync {
-    fn handle(&self, request: Request, next: Next) -> Response;
+    fn handle(&self, request: Request, next: Next) -> BoxFuture<Response>;
 }
 
 pub struct Next {
@@ -28,7 +32,7 @@ impl Next {
         }
     }
 
-    pub fn run(self, request: Request) -> Response {
+    pub fn run(self, request: Request) -> BoxFuture<Response> {
         if self.index < self.middlewares.len() {
             let middleware = Arc::clone(&self.middlewares[self.index]);
             let next = Next {

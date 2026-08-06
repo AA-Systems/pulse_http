@@ -4,6 +4,7 @@ use crate::{
     middleware::{Middleware, Next},
     request::Request,
     response::Response,
+    router::BoxFuture,
 };
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
@@ -13,22 +14,24 @@ static REQUEST_COUNTER: AtomicU64 = AtomicU64::new(1);
 pub struct RequestId;
 
 impl Middleware for RequestId {
-    fn handle(&self, mut request: Request, next: Next) -> Response {
-        let request_id = request
-            .headers
-            .get(REQUEST_ID_HEADER)
-            .cloned()
-            .unwrap_or_else(generate_request_id);
+    fn handle(&self, mut request: Request, next: Next) -> BoxFuture<Response> {
+        Box::pin(async move {
+            let request_id = request
+                .headers
+                .get(REQUEST_ID_HEADER)
+                .cloned()
+                .unwrap_or_else(generate_request_id);
 
-        request
-            .headers
-            .insert(REQUEST_ID_HEADER.to_string(), request_id.clone());
+            request
+                .headers
+                .insert(REQUEST_ID_HEADER.to_string(), request_id.clone());
 
-        let mut response = next.run(request);
-        response
-            .headers
-            .insert(REQUEST_ID_HEADER.to_string(), request_id);
-        response
+            let mut response = next.run(request).await;
+            response
+                .headers
+                .insert(REQUEST_ID_HEADER.to_string(), request_id);
+            response
+        })
     }
 }
 
