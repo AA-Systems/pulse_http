@@ -13,7 +13,7 @@ use crate::{
     state::State,
 };
 use std::{net::SocketAddr, sync::Arc};
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream, sync::watch};
 
 pub async fn handle_client(
     mut stream: TcpStream,
@@ -22,6 +22,7 @@ pub async fn handle_client(
     state: Arc<State>,
     rate_limit: Arc<RateLimit>,
     peer_addr: SocketAddr,
+    mut shutdown_rx: watch::Receiver<bool>,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -31,12 +32,28 @@ pub async fn handle_client(
             return;
         }
 
-        let (headers, body_start) = match read_headers(&mut stream, &mut buffer).await {
-            Ok(parsed) => parsed,
-            Err(ReadHeadersError::Closed) => return,
-            Err(ReadHeadersError::BadRequest) => {
-                Response::bad_request().write_to_stream(&mut stream).await;
-                return;
+        if *shutdown_rx.borrow() {
+            return;
+        }
+
+        let (headers, body_start) = tokio::select! {
+            biased;
+            result = shutdown_rx.changed() => {
+                match result {
+                    Ok(()) if *shutdown_rx.borrow() => return,
+                    Ok(()) => continue,
+                    Err(_) => return,
+                }
+            }
+            result = read_headers(&mut stream, &mut buffer) => {
+                match result {
+                    Ok(parsed) => parsed,
+                    Err(ReadHeadersError::Closed) => return,
+                    Err(ReadHeadersError::BadRequest) => {
+                        Response::bad_request().write_to_stream(&mut stream).await;
+                        return;
+                    }
+                }
             }
         };
 
@@ -110,7 +127,7 @@ pub async fn handle_client(
         request_count += 1;
         buffer = leftover;
 
-        if !keep_alive {
+        if !keep_alive || *shutdown_rx.borrow() {
             return;
         }
     }

@@ -1,12 +1,19 @@
 use crate::{
+    constants::SHUTDOWN_GRACE_SECS,
     middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders},
     rate_limit::RateLimit,
     router::Router,
     server::handle_client::handle_client,
     state::State,
 };
-use std::sync::Arc;
-use tokio::{net::TcpListener, sync::Semaphore};
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    net::TcpListener,
+    signal,
+    sync::{Semaphore, watch},
+    task::JoinSet,
+    time::sleep,
+};
 
 pub mod handle_client;
 
@@ -71,36 +78,75 @@ impl Server {
 
     pub async fn serve(self) {
         println!("Server started");
+
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let admission = Arc::new(Semaphore::new(self.max_connections as usize));
         let router = Arc::new(self.router);
         let middlewares = Arc::new(self.middlewares);
         let state = Arc::new(self.state);
         let rate_limit = self.rate_limit;
+        let mut tasks = JoinSet::new();
 
         loop {
-            let stream_result = self.listener.accept().await;
-
-            match stream_result {
-                Ok((stream, peer_addr)) => {
-                    let permit = match admission.clone().try_acquire_owned() {
-                        Ok(p) => p,
-                        Err(_error) => {
-                            drop(stream);
-                            continue;
-                        }
-                    };
-                    let router = Arc::clone(&router);
-                    let middlewares = Arc::clone(&middlewares);
-                    let state = Arc::clone(&state);
-                    let rate_limit = Arc::clone(&rate_limit);
-                    tokio::spawn(async move {
-                        let _permit = permit;
-                        handle_client(stream, router, middlewares, state, rate_limit, peer_addr)
-                            .await;
-                    });
+            tokio::select! {
+                _ = signal::ctrl_c() => {
+                    println!("Shutdown signal received, draining connections...");
+                    let _ = shutdown_tx.send(true);
+                    break;
                 }
-                Err(_error) => {}
+                stream_result = self.listener.accept() => {
+                    match stream_result {
+                        Ok((stream, peer_addr)) => {
+                            let permit = match admission.clone().try_acquire_owned() {
+                                Ok(p) => p,
+                                Err(_error) => {
+                                    drop(stream);
+                                    continue;
+                                }
+                            };
+                            let router = Arc::clone(&router);
+                            let middlewares = Arc::clone(&middlewares);
+                            let state = Arc::clone(&state);
+                            let rate_limit = Arc::clone(&rate_limit);
+                            let shutdown_rx = shutdown_rx.clone();
+                            tasks.spawn(async move {
+                                let _permit = permit;
+                                handle_client(
+                                    stream,
+                                    router,
+                                    middlewares,
+                                    state,
+                                    rate_limit,
+                                    peer_addr,
+                                    shutdown_rx,
+                                )
+                                .await;
+                            });
+                        }
+                        Err(_error) => {}
+                    }
+                }
             }
         }
+
+        drop(self.listener);
+
+        tokio::select! {
+            _ = async {
+                while tasks.join_next().await.is_some() {}
+            } => {
+                println!("All connections drained");
+            }
+            _ = sleep(Duration::from_secs(SHUTDOWN_GRACE_SECS)) => {
+                println!(
+                    "Grace period ({}s) elapsed, aborting remaining connections",
+                    SHUTDOWN_GRACE_SECS
+                );
+                tasks.abort_all();
+                while tasks.join_next().await.is_some() {}
+            }
+        }
+
+        println!("Server stopped");
     }
 }
