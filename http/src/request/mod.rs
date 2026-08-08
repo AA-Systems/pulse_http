@@ -1,6 +1,6 @@
 use crate::{headers::Headers, helpers::split_path_and_query::split_path_and_query, state::State};
 use serde::de::DeserializeOwned;
-use std::collections::HashMap;
+use std::{collections::HashMap, net::IpAddr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Method {
@@ -47,10 +47,16 @@ pub struct Request {
     pub body: Vec<u8>,
     pub http_version: String,
     pub state: State,
+    pub ip_addr: IpAddr,
 }
 
 impl Request {
-    pub fn from_headers(headers: Headers, body: Vec<u8>, state: State) -> Option<Self> {
+    pub fn from_headers(
+        headers: Headers,
+        body: Vec<u8>,
+        state: State,
+        ip_addr: IpAddr,
+    ) -> Option<Self> {
         let method = Method::parse(&headers.method)?;
         let (path, query) = split_path_and_query(&headers.path);
 
@@ -63,6 +69,7 @@ impl Request {
             body,
             http_version: headers.http_version,
             state,
+            ip_addr,
         })
     }
 

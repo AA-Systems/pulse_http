@@ -6,12 +6,13 @@ use crate::{
         should_keep_alive::should_keep_alive,
     },
     middleware::{Middleware, Next},
+    rate_limit::RateLimit,
     request::Request,
     response::Response,
     router::Router,
     state::State,
 };
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpStream;
 
 pub async fn handle_client(
@@ -19,6 +20,8 @@ pub async fn handle_client(
     router: Arc<Router>,
     middlewares: Arc<Vec<Arc<dyn Middleware>>>,
     state: Arc<State>,
+    rate_limit: Arc<RateLimit>,
+    peer_addr: SocketAddr,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -69,7 +72,7 @@ pub async fn handle_client(
             }
         };
 
-        let request = match Request::from_headers(headers, body, (*state).clone()) {
+        let request = match Request::from_headers(headers, body, (*state).clone(), peer_addr.ip()) {
             Some(request) => request,
             None => {
                 Response::bad_request().write_to_stream(&mut stream).await;
@@ -80,10 +83,24 @@ pub async fn handle_client(
         let keep_alive = should_keep_alive(&request);
 
         let router = Arc::clone(&router);
-        let endpoint = Arc::new(move |mut req: Request| match router.match_route(&mut req) {
-            Some(handler) => handler(req),
-            None => Box::pin(async { Response::not_found() }),
-        });
+        let rate_limit = Arc::clone(&rate_limit);
+        let endpoint = Arc::new(
+            move |mut req: Request| -> crate::router::BoxFuture<Response> {
+                match router.match_route(&mut req) {
+                    Some((handler, route_limit)) => {
+                        let rate_limit = Arc::clone(&rate_limit);
+                        Box::pin(async move {
+                            let limit = route_limit.unwrap_or_else(|| rate_limit.default_limit());
+                            if !rate_limit.allow_request(&req, limit).await {
+                                return Response::too_many_requests();
+                            }
+                            handler(req).await
+                        })
+                    }
+                    None => Box::pin(async { Response::not_found() }),
+                }
+            },
+        );
 
         let response = Next::new(Arc::clone(&middlewares), endpoint)
             .run(request)

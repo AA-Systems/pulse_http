@@ -1,5 +1,6 @@
 use crate::{
     middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders},
+    rate_limit::RateLimit,
     router::Router,
     server::handle_client::handle_client,
     state::State,
@@ -15,6 +16,7 @@ pub struct Server {
     pub router: Router,
     pub middlewares: Vec<Arc<dyn Middleware>>,
     pub state: State,
+    pub rate_limit: Arc<RateLimit>,
 }
 
 impl Server {
@@ -34,6 +36,7 @@ impl Server {
                 Arc::new(CatchPanic),
             ],
             state: State::new(),
+            rate_limit: Arc::new(RateLimit::new()),
         }
     }
 
@@ -53,6 +56,13 @@ impl Server {
         self
     }
 
+    pub fn rate_limit(self, rate_limit: RateLimit) -> Self {
+        Self {
+            rate_limit: Arc::new(rate_limit),
+            ..self
+        }
+    }
+
     pub fn state<T: Send + Sync + 'static>(mut self, value: T) -> Self {
         let temp_state = self.state.insert(value);
         self.state = temp_state;
@@ -60,16 +70,18 @@ impl Server {
     }
 
     pub async fn serve(self) {
+        println!("Server started");
         let admission = Arc::new(Semaphore::new(self.max_connections as usize));
         let router = Arc::new(self.router);
         let middlewares = Arc::new(self.middlewares);
         let state = Arc::new(self.state);
+        let rate_limit = self.rate_limit;
 
         loop {
             let stream_result = self.listener.accept().await;
 
             match stream_result {
-                Ok((stream, _)) => {
+                Ok((stream, peer_addr)) => {
                     let permit = match admission.clone().try_acquire_owned() {
                         Ok(p) => p,
                         Err(_error) => {
@@ -80,9 +92,11 @@ impl Server {
                     let router = Arc::clone(&router);
                     let middlewares = Arc::clone(&middlewares);
                     let state = Arc::clone(&state);
+                    let rate_limit = Arc::clone(&rate_limit);
                     tokio::spawn(async move {
                         let _permit = permit;
-                        handle_client(stream, router, middlewares, state).await;
+                        handle_client(stream, router, middlewares, state, rate_limit, peer_addr)
+                            .await;
                     });
                 }
                 Err(_error) => {}

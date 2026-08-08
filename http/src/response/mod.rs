@@ -63,6 +63,10 @@ impl Response {
         Self::text(404, "Not found")
     }
 
+    pub fn too_many_requests() -> Self {
+        Self::text(429, "Too many requests")
+    }
+
     pub fn no_content() -> Self {
         let mut response = Self::new(204);
         response.headers.insert("content-length".into(), "0".into());

@@ -19,12 +19,14 @@ impl Middleware for RequestLogger {
                 .get("x-request-id")
                 .cloned()
                 .unwrap_or_else(|| "-".into());
+            let ip_addr = request.ip_addr;
             let started = Instant::now();
 
             let response = next.run(request).await; // Response here
 
             println!(
-                "[{request_id}] {method} {path} -> {} ({} ms)",
+                "[{request_id}] {} {method} {path} -> {} ({} ms)",
+                ip_addr,
                 response.status,
                 started.elapsed().as_millis()
             );

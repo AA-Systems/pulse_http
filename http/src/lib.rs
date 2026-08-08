@@ -3,6 +3,7 @@ pub mod errors;
 pub mod headers;
 pub mod helpers;
 pub mod middleware;
+pub mod rate_limit;
 pub mod request;
 pub mod response;
 pub mod router;

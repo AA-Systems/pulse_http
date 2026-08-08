@@ -1,6 +1,7 @@
 pub mod find_subslice;
 pub mod parse_header_line;
 pub mod parse_request_line;
+pub mod rate_limit_key;
 pub mod read_body;
 pub mod read_headers;
 pub mod read_with_timeout;
