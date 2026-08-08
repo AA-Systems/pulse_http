@@ -1,5 +1,5 @@
 use crate::{
-    constants::{MAX_BODY_SIZE, MAX_REQUESTS_PER_CONNECTION},
+    constants::MAX_REQUESTS_PER_CONNECTION,
     errors::ReadHeadersError,
     helpers::{
         read_body::read_content_length_body, read_headers::read_headers,
@@ -23,6 +23,8 @@ pub async fn handle_client(
     rate_limit: Arc<RateLimit>,
     peer_addr: SocketAddr,
     mut shutdown_rx: watch::Receiver<bool>,
+    max_body_size: usize,
+    read_timeout_sec: u64,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -45,7 +47,7 @@ pub async fn handle_client(
                     Err(_) => return,
                 }
             }
-            result = read_headers(&mut stream, &mut buffer) => {
+            result = read_headers(&mut stream, &mut buffer, read_timeout_sec) => {
                 match result {
                     Ok(parsed) => parsed,
                     Err(ReadHeadersError::Closed) => return,
@@ -78,7 +80,8 @@ pub async fn handle_client(
             &mut buffer,
             body_start,
             content_length,
-            MAX_BODY_SIZE,
+            max_body_size,
+            read_timeout_sec,
         )
         .await
         {

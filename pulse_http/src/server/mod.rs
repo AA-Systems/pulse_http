@@ -1,5 +1,8 @@
 use crate::{
-    constants::SHUTDOWN_GRACE_SECS,
+    constants::{
+        DEFAULT_MAX_BODY_SIZE, DEFAULT_MAX_CONNECTIONS, DEFAULT_READ_TIMEOUT_SECS,
+        SHUTDOWN_GRACE_SECS,
+    },
     middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders},
     rate_limit::RateLimit,
     router::Router,
@@ -20,6 +23,8 @@ pub mod handle_client;
 pub struct Server {
     pub listener: TcpListener,
     pub max_connections: u16,
+    pub max_body_size: usize,
+    pub read_timeout_sec: u64,
     pub router: Router,
     pub middlewares: Vec<Arc<dyn Middleware>>,
     pub state: State,
@@ -33,7 +38,9 @@ impl Server {
                 TcpListener::bind(address).await,
                 "Unable to initialize tcp listener",
             ),
-            max_connections: 2,
+            max_connections: DEFAULT_MAX_CONNECTIONS,
+            max_body_size: DEFAULT_MAX_BODY_SIZE,
+            read_timeout_sec: DEFAULT_READ_TIMEOUT_SECS,
             router: Router::new(),
             middlewares: vec![
                 Arc::new(RequestId),
@@ -50,6 +57,20 @@ impl Server {
     pub fn max_connects(self, connections: u16) -> Self {
         Self {
             max_connections: connections,
+            ..self
+        }
+    }
+
+    pub fn max_body_size(self, body_size: usize) -> Self {
+        Self {
+            max_body_size: body_size,
+            ..self
+        }
+    }
+
+    pub fn read_timeout_sec(self, read_timeout: u64) -> Self {
+        Self {
+            read_timeout_sec: read_timeout,
             ..self
         }
     }
@@ -119,6 +140,8 @@ impl Server {
                                     rate_limit,
                                     peer_addr,
                                     shutdown_rx,
+                                    self.max_body_size,
+                                    self.read_timeout_sec
                                 )
                                 .await;
                             });

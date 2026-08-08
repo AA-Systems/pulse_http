@@ -9,6 +9,7 @@ use tokio::net::TcpStream;
 pub async fn read_headers(
     stream: &mut TcpStream,
     buffer: &mut Vec<u8>,
+    read_timeout_sec: u64,
 ) -> Result<(Headers, usize), ReadHeadersError> {
     let mut chunk = [0u8; 1024];
 
@@ -28,7 +29,7 @@ pub async fn read_headers(
             return Err(ReadHeadersError::BadRequest);
         }
 
-        match read_with_timeout(stream, &mut chunk).await {
+        match read_with_timeout(stream, &mut chunk, read_timeout_sec).await {
             Ok(0) => {
                 return if buffer.is_empty() {
                     Err(ReadHeadersError::Closed)
