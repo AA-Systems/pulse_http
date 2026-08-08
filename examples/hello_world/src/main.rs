@@ -2,7 +2,7 @@ mod handlers;
 
 use crate::handlers::insert_user::insert_user;
 use handlers::{echo::echo, form::form, health::health, hello::hello};
-use http::{router::Router, server::Server};
+use pulse_http::{router::Router, server::Server};
 use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
