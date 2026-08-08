@@ -2,6 +2,16 @@
 name = "pulse_http"
 version = "0.1.0"
 edition = "2024"
+description = "Async HTTP/1.1 framework on Tokio — raw TCP, routing, middleware, no Hyper"
+license = "MIT"
+readme = "../README.md"
+repository = "https://github.com/AA-Systems/pulse_http"
+homepage = "https://github.com/AA-Systems/pulse_http"
+documentation = "https://docs.rs/pulse_http"
+authors = ["akshatarora130 <akshatarora130@gmail.com>"]
+keywords = ["http", "server", "async", "tokio", "framework"]
+categories = ["network-programming", "web-programming::http-server", "asynchronous"]
+exclude = ["../examples/*", "../PRD.md", "../target/*"]
 
 [dependencies]
 futures = "0.3"
