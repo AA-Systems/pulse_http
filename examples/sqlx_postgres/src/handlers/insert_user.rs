@@ -1,4 +1,4 @@
-use pulse_http::{request::Request, response::Response};
+use pulse_http::{Request, Response};
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 

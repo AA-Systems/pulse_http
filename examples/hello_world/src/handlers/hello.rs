@@ -1,4 +1,4 @@
-use pulse_http::{request::Request, response::Response};
+use pulse_http::{Request, Response};
 
 pub async fn hello(req: Request) -> Response {
     let name = req

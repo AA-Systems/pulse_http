@@ -1,29 +1,18 @@
 mod handlers;
 
-use crate::handlers::insert_user::insert_user;
 use handlers::{echo::echo, form::form, health::health, hello::hello};
-use pulse_http::{router::Router, server::Server};
-use sqlx::postgres::PgPoolOptions;
+use pulse_http::{Router, Server};
 
 #[tokio::main]
 async fn main() {
-    let database_url = "postgres://myuser:mysecretpassword@localhost:5432/mydatabase";
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(database_url)
-        .await
-        .expect("failed to connect to postgres");
-
     let router = Router::new()
-        .get_with_rate_limit("/health", health, 5.0)
+        .get("/health", health)
         .get("/hello/:name", hello)
         .post("/echo", echo)
-        .post("/form", form)
-        .post("/insert_user", insert_user);
+        .post("/form", form);
 
-    Server::bind(String::from("127.0.0.1:3001"))
+    Server::bind(String::from("127.0.0.1:3000"))
         .await
-        .state(pool)
         .router(router)
         .serve()
         .await;

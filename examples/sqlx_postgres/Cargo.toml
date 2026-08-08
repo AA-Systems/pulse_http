@@ -1,9 +1,10 @@
 [package]
-name = "hello_world"
+name = "sqlx_postgres"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 pulse_http = { path = "../../pulse_http" }
 serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "macros"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }

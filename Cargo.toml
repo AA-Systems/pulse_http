@@ -1,3 +1,8 @@
 [workspace]
-resolver = '3'
-members = ["examples/hello_world","pulse_http"]
+resolver = "3"
+members = [
+    "pulse_http",
+    "examples/hello_world",
+    "examples/sqlx_postgres",
+    "examples/rate_limit",
+]
