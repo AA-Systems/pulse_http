@@ -13,3 +13,9 @@ pub enum ReadHeadersError {
     Closed,
     BadRequest,
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum FormError {
+    InvalidUtf8,
+    InvalidPercentEncoding,
+}

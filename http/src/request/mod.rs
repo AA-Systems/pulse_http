@@ -1,6 +1,11 @@
-use crate::{headers::Headers, helpers::split_path_and_query::split_path_and_query, state::State};
+use crate::{
+    errors::FormError,
+    headers::Headers,
+    helpers::{parse_urlencoded::parse_urlencoded, split_path_and_query::split_path_and_query},
+    state::State,
+};
 use serde::de::DeserializeOwned;
-use std::{collections::HashMap, net::IpAddr};
+use std::{collections::HashMap, net::IpAddr, str::from_utf8};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Method {
@@ -75,5 +80,10 @@ impl Request {
 
     pub fn json<T: DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
         serde_json::from_slice(&self.body)
+    }
+
+    pub fn form(&self) -> Result<HashMap<String, String>, FormError> {
+        let body = from_utf8(&self.body).map_err(|_| FormError::InvalidUtf8)?;
+        parse_urlencoded(body)
     }
 }

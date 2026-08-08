@@ -1,7 +1,7 @@
 mod handlers;
 
 use crate::handlers::insert_user::insert_user;
-use handlers::{echo::echo, health::health, hello::hello};
+use handlers::{echo::echo, form::form, health::health, hello::hello};
 use http::{router::Router, server::Server};
 use sqlx::postgres::PgPoolOptions;
 
@@ -18,6 +18,7 @@ async fn main() {
         .get_with_rate_limit("/health", health, 5.0)
         .get("/hello/:name", hello)
         .post("/echo", echo)
+        .post("/form", form)
         .post("/insert_user", insert_user);
 
     Server::bind(String::from("127.0.0.1:3001"))
