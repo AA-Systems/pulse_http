@@ -1,8 +1,8 @@
-use crate::helpers::reason_phrase::reason_phrase;
+use crate::helpers::{reason_phrase::reason_phrase, write_with_timeout::write_with_timeout};
 use serde::Serialize;
 use serde_json::to_vec;
 use std::collections::HashMap;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::net::TcpStream;
 
 pub struct Response {
     pub status: u16,
@@ -92,7 +92,11 @@ impl Response {
             .or_insert_with(|| "DENY".into());
     }
 
-    pub async fn write_to_stream(mut self, stream: &mut TcpStream) {
+    pub async fn write_to_stream(
+        mut self,
+        write_timeout_sec: u64,
+        stream: &mut TcpStream,
+    ) -> Result<(), ()> {
         self.apply_security_headers();
 
         let reason = reason_phrase(self.status);
@@ -114,9 +118,10 @@ impl Response {
         }
         output.push_str("\r\n");
 
-        let _ = stream.write_all(output.as_bytes()).await;
+        write_with_timeout(stream, output.as_bytes(), write_timeout_sec).await?;
         if !self.body.is_empty() {
-            let _ = stream.write_all(&self.body).await;
+            write_with_timeout(stream, &self.body, write_timeout_sec).await?;
         }
+        Ok(())
     }
 }

@@ -25,6 +25,7 @@ pub async fn handle_client(
     mut shutdown_rx: watch::Receiver<bool>,
     max_body_size: usize,
     read_timeout_sec: u64,
+    write_timeout_sec: u64,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -52,7 +53,9 @@ pub async fn handle_client(
                     Ok(parsed) => parsed,
                     Err(ReadHeadersError::Closed) => return,
                     Err(ReadHeadersError::BadRequest) => {
-                        Response::bad_request().write_to_stream(&mut stream).await;
+                        let _ = Response::bad_request()
+                            .write_to_stream(write_timeout_sec, &mut stream)
+                            .await;
                         return;
                     }
                 }
@@ -60,7 +63,9 @@ pub async fn handle_client(
         };
 
         if headers.fields.contains_key("transfer-encoding") {
-            Response::bad_request().write_to_stream(&mut stream).await;
+            let _ = Response::bad_request()
+                .write_to_stream(write_timeout_sec, &mut stream)
+                .await;
             return;
         }
 
@@ -68,7 +73,9 @@ pub async fn handle_client(
             Some(value) => match value.parse::<usize>() {
                 Ok(n) => n,
                 Err(_) => {
-                    Response::bad_request().write_to_stream(&mut stream).await;
+                    let _ = Response::bad_request()
+                        .write_to_stream(write_timeout_sec, &mut stream)
+                        .await;
                     return;
                 }
             },
@@ -87,7 +94,9 @@ pub async fn handle_client(
         {
             Ok(result) => result,
             Err(_) => {
-                Response::bad_request().write_to_stream(&mut stream).await;
+                let _ = Response::bad_request()
+                    .write_to_stream(write_timeout_sec, &mut stream)
+                    .await;
                 return;
             }
         };
@@ -95,7 +104,9 @@ pub async fn handle_client(
         let request = match Request::from_headers(headers, body, (*state).clone(), peer_addr.ip()) {
             Some(request) => request,
             None => {
-                Response::bad_request().write_to_stream(&mut stream).await;
+                let _ = Response::bad_request()
+                    .write_to_stream(write_timeout_sec, &mut stream)
+                    .await;
                 return;
             }
         };
@@ -117,7 +128,7 @@ pub async fn handle_client(
                             handler(req).await
                         })
                     }
-                    None => Box::pin(async { Response::not_found() }),
+                    None => Box::pin(async move { Response::not_found() }),
                 }
             },
         );
@@ -126,7 +137,14 @@ pub async fn handle_client(
             .run(request)
             .await;
 
-        response.write_to_stream(&mut stream).await;
+        if response
+            .write_to_stream(write_timeout_sec, &mut stream)
+            .await
+            .is_err()
+        {
+            return;
+        }
+
         request_count += 1;
         buffer = leftover;
 

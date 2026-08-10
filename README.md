@@ -41,16 +41,17 @@ async fn main() {
 
 Ctrl+C triggers graceful shutdown (stop accept → drain connections → grace abort).
 
-## Features (v0.1)
+## Features
 
 - Tokio TCP listener, task-per-connection, admission semaphore
-- HTTP/1.1 keep-alive, `Content-Length` bodies, read timeouts
+- HTTP/1.1 keep-alive, `Content-Length` bodies
+- Read and write timeouts (slow clients close the connection)
 - Trie router (static + `:param`), query params
 - Async middleware (request id, logging, CORS, security headers, panic catch)
 - JSON + `application/x-www-form-urlencoded`
 - Typed app `State`
 - Per-route token-bucket rate limits
-- Configurable max connections, max body size, read timeout
+- Configurable max connections, max body size, read/write timeouts
 - Graceful shutdown
 
 ## Examples
@@ -83,14 +84,15 @@ Server::bind("127.0.0.1:3000".into())
     .max_connects(256)
     .max_body_size(5 * 1024 * 1024)
     .read_timeout_sec(60)
+    .write_timeout_sec(60)
     .router(router)
     .serve()
     .await;
 ```
 
-## Not in v0.1 (later)
+## Not yet (later)
 
-Chunked transfer encoding, multipart uploads, streaming responses, write timeouts, fuzz tests, benchmarks.
+Chunked transfer encoding, multipart uploads, streaming responses, fuzz tests, benchmarks.
 
 ## License
 
