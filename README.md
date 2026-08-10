@@ -45,6 +45,7 @@ Ctrl+C triggers graceful shutdown (stop accept → drain connections → grace a
 
 - Tokio TCP listener, task-per-connection, admission semaphore
 - HTTP/1.1 keep-alive, `Content-Length` and chunked request bodies
+- Streaming file responses (`Response::file`) without buffering the whole file
 - Read and write timeouts (slow clients close the connection)
 - Trie router (static + `:param`), query params
 - Async middleware (request id, logging, CORS, security headers, panic catch)
@@ -92,7 +93,7 @@ Server::bind("127.0.0.1:3000".into())
 
 ## Not yet (later)
 
-Streaming responses, fuzz tests, benchmarks.
+Fuzz tests, benchmarks.
 
 ## License
 

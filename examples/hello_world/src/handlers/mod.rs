@@ -1,3 +1,4 @@
+pub mod download;
 pub mod echo;
 pub mod form;
 pub mod health;

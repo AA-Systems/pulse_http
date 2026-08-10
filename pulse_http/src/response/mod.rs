@@ -1,13 +1,22 @@
-use crate::helpers::{reason_phrase::reason_phrase, write_with_timeout::write_with_timeout};
+use crate::{
+    body::Body,
+    helpers::{reason_phrase::reason_phrase, write_with_timeout::write_with_timeout},
+};
 use serde::Serialize;
 use serde_json::to_vec;
-use std::collections::HashMap;
-use tokio::net::TcpStream;
+use std::{
+    collections::HashMap,
+    fs::metadata,
+    path::{Path, PathBuf},
+};
+use tokio::{fs::File, io::AsyncReadExt, net::TcpStream};
+
+const FILE_READ_CHUNK: usize = 64 * 1024;
 
 pub struct Response {
     pub status: u16,
     pub headers: HashMap<String, String>,
-    pub body: Vec<u8>,
+    pub body: Body,
 }
 
 impl Response {
@@ -15,7 +24,7 @@ impl Response {
         Self {
             status,
             headers: HashMap::new(),
-            body: Vec::new(),
+            body: Body::Bytes(Vec::new()),
         }
     }
 
@@ -31,7 +40,7 @@ impl Response {
             .headers
             .insert("content-length".into(), body.len().to_string());
 
-        response.body = body;
+        response.body = Body::Bytes(body);
         response
     }
 
@@ -47,8 +56,39 @@ impl Response {
             .headers
             .insert("content-length".into(), body.len().to_string());
 
-        response.body = body;
+        response.body = Body::Bytes(body);
         response
+    }
+
+    pub fn file(path: impl AsRef<Path>) -> Result<Self, ()> {
+        let path = path.as_ref();
+        let meta = metadata(path).map_err(|_| ())?;
+        if !meta.is_file() {
+            return Err(());
+        }
+
+        let len = meta.len();
+        let filename = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("download");
+
+        let mut response = Self::new(200);
+        response
+            .headers
+            .insert("content-type".into(), content_type_for(path).into());
+        response
+            .headers
+            .insert("content-length".into(), len.to_string());
+        response.headers.insert(
+            "content-disposition".into(),
+            format!("attachment; filename=\"{filename}\""),
+        );
+        response.body = Body::File {
+            path: PathBuf::from(path),
+            len,
+        };
+        Ok(response)
     }
 
     pub fn ok(body: impl Into<String>) -> Self {
@@ -119,9 +159,56 @@ impl Response {
         output.push_str("\r\n");
 
         write_with_timeout(stream, output.as_bytes(), write_timeout_sec).await?;
-        if !self.body.is_empty() {
-            write_with_timeout(stream, &self.body, write_timeout_sec).await?;
+        self.write_body(write_timeout_sec, stream).await
+    }
+
+    async fn write_body(self, write_timeout_sec: u64, stream: &mut TcpStream) -> Result<(), ()> {
+        match self.body {
+            Body::Bytes(bytes) => {
+                if !bytes.is_empty() {
+                    write_with_timeout(stream, &bytes, write_timeout_sec).await?;
+                }
+                Ok(())
+            }
+            Body::File { path, len } => stream_file(path, len, write_timeout_sec, stream).await,
         }
-        Ok(())
+    }
+}
+
+async fn stream_file(
+    path: PathBuf,
+    len: u64,
+    write_timeout_sec: u64,
+    stream: &mut TcpStream,
+) -> Result<(), ()> {
+    let mut file = File::open(path).await.map_err(|_| ())?;
+    let mut buf = vec![0u8; FILE_READ_CHUNK];
+    let mut remaining = len;
+
+    while remaining > 0 {
+        let n = file.read(&mut buf).await.map_err(|_| ())?;
+        if n == 0 {
+            return Err(());
+        }
+        write_with_timeout(stream, &buf[..n], write_timeout_sec).await?;
+        remaining = remaining.saturating_sub(n as u64);
+    }
+
+    Ok(())
+}
+
+fn content_type_for(path: &Path) -> &'static str {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("html" | "htm") => "text/html; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("js") => "text/javascript; charset=utf-8",
+        Some("json") => "application/json",
+        Some("txt" | "md") => "text/plain; charset=utf-8",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        Some("pdf") => "application/pdf",
+        _ => "application/octet-stream",
     }
 }
