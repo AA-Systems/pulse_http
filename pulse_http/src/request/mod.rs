@@ -1,7 +1,11 @@
 use crate::{
-    errors::FormError,
+    errors::{FormError, MultipartError},
     headers::Headers,
-    helpers::{parse_urlencoded::parse_urlencoded, split_path_and_query::split_path_and_query},
+    helpers::{
+        parse_multipart::{Multipart, parse_multipart},
+        parse_urlencoded::parse_urlencoded,
+        split_path_and_query::split_path_and_query,
+    },
     state::State,
 };
 use serde::de::DeserializeOwned;
@@ -85,5 +89,13 @@ impl Request {
     pub fn form(&self) -> Result<HashMap<String, String>, FormError> {
         let body = from_utf8(&self.body).map_err(|_| FormError::InvalidUtf8)?;
         parse_urlencoded(body)
+    }
+
+    pub fn multipart(&self) -> Result<Multipart, MultipartError> {
+        let content_type = self
+            .headers
+            .get("content-type")
+            .ok_or(MultipartError::MissingContentType)?;
+        parse_multipart(&self.body, content_type)
     }
 }

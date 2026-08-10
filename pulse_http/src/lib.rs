@@ -19,17 +19,18 @@
 //! }
 //! ```
 //!
-//! # v0.1 scope
+//! # Current scope
 //!
-//! Included: keep-alive, `Content-Length` bodies, routing, middleware, JSON,
-//! url-encoded forms, typed state, rate limits, CORS, graceful shutdown.
+//! Included: keep-alive, `Content-Length` and chunked request bodies, routing,
+//! middleware, JSON, url-encoded forms, multipart form-data, streaming file
+//! responses, typed state, rate limits, CORS, read/write timeouts, graceful
+//! shutdown.
 //!
-//! Not yet (planned for later): chunked transfer encoding, multipart uploads,
-//! streaming responses, write timeouts, fuzz tests, and benchmarks.
 
+pub mod body;
 pub mod constants;
 pub mod errors;
-mod headers;
+pub mod headers;
 mod helpers;
 pub mod middleware;
 pub mod rate_limit;
@@ -39,7 +40,11 @@ pub mod router;
 pub mod server;
 pub mod state;
 
-pub use errors::FormError;
+pub use body::Body;
+pub use errors::{FormError, MultipartError};
+pub use headers::Headers;
+pub use helpers::parse_multipart::{Multipart, MultipartFile, parse_multipart};
+pub use helpers::parse_urlencoded::parse_urlencoded;
 pub use middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders};
 pub use rate_limit::{Limit, RateLimit};
 pub use request::{Method, Request};

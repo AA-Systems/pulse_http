@@ -9,7 +9,7 @@ Async HTTP/1.1 framework for Rust, built on [Tokio](https://tokio.rs) from raw T
 
 ```toml
 [dependencies]
-pulse_http = "0.1"
+pulse_http = "0.2"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -41,16 +41,18 @@ async fn main() {
 
 Ctrl+C triggers graceful shutdown (stop accept → drain connections → grace abort).
 
-## Features (v0.1)
+## Features
 
 - Tokio TCP listener, task-per-connection, admission semaphore
-- HTTP/1.1 keep-alive, `Content-Length` bodies, read timeouts
+- HTTP/1.1 keep-alive, `Content-Length` and chunked request bodies
+- Streaming file responses (`Response::file`) without buffering the whole file
+- Read and write timeouts (slow clients close the connection)
 - Trie router (static + `:param`), query params
 - Async middleware (request id, logging, CORS, security headers, panic catch)
-- JSON + `application/x-www-form-urlencoded`
+- JSON + `application/x-www-form-urlencoded` + `multipart/form-data`
 - Typed app `State`
 - Per-route token-bucket rate limits
-- Configurable max connections, max body size, read timeout
+- Configurable max connections, max body size, read/write timeouts
 - Graceful shutdown
 
 ## Examples
@@ -83,14 +85,30 @@ Server::bind("127.0.0.1:3000".into())
     .max_connects(256)
     .max_body_size(5 * 1024 * 1024)
     .read_timeout_sec(60)
+    .write_timeout_sec(60)
     .router(router)
     .serve()
     .await;
 ```
 
-## Not in v0.1 (later)
+## Benchmarks
 
-Chunked transfer encoding, multipart uploads, streaming responses, write timeouts, fuzz tests, benchmarks.
+Micro-benchmarks via [Criterion](https://github.com/bheisler/criterion.rs) (release mode). Numbers below are from one run on Apple Silicon (Aug 2026) — treat as relative, not absolute.
+
+| Bench                | Median time |
+| -------------------- | ----------- |
+| `parse_headers`      | ~471 ns     |
+| `parse_urlencoded`   | ~326 ns     |
+| `parse_multipart`    | ~872 ns     |
+| `router_match_param` | ~222 ns     |
+
+Reproduce:
+
+```bash
+cargo bench -p pulse_http --bench micro
+```
+
+HTML reports (local): `pulse_http/target/criterion/*/report/index.html`
 
 ## License
 

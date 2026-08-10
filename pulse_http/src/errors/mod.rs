@@ -19,3 +19,13 @@ pub enum FormError {
     InvalidUtf8,
     InvalidPercentEncoding,
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum MultipartError {
+    MissingContentType,
+    MissingBoundary,
+    InvalidBody,
+    InvalidPartHeaders,
+    MissingDispositionName,
+    InvalidUtf8,
+}

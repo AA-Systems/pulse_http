@@ -2,7 +2,9 @@ use crate::{
     constants::MAX_REQUESTS_PER_CONNECTION,
     errors::ReadHeadersError,
     helpers::{
-        read_body::read_content_length_body, read_headers::read_headers,
+        read_body::read_content_length_body,
+        read_chunked_body::{is_chunked_transfer_encoding, read_chunked_body},
+        read_headers::read_headers,
         should_keep_alive::should_keep_alive,
     },
     middleware::{Middleware, Next},
@@ -25,6 +27,7 @@ pub async fn handle_client(
     mut shutdown_rx: watch::Receiver<bool>,
     max_body_size: usize,
     read_timeout_sec: u64,
+    write_timeout_sec: u64,
 ) {
     let mut buffer = Vec::new();
     let mut request_count = 0u32;
@@ -52,50 +55,80 @@ pub async fn handle_client(
                     Ok(parsed) => parsed,
                     Err(ReadHeadersError::Closed) => return,
                     Err(ReadHeadersError::BadRequest) => {
-                        Response::bad_request().write_to_stream(&mut stream).await;
+                        let _ = Response::bad_request()
+                            .write_to_stream(write_timeout_sec, &mut stream)
+                            .await;
                         return;
                     }
                 }
             }
         };
 
-        if headers.fields.contains_key("transfer-encoding") {
-            Response::bad_request().write_to_stream(&mut stream).await;
-            return;
-        }
+        let (body, leftover) = if let Some(te) = headers.fields.get("transfer-encoding") {
+            if !is_chunked_transfer_encoding(te) {
+                let _ = Response::bad_request()
+                    .write_to_stream(write_timeout_sec, &mut stream)
+                    .await;
+                return;
+            }
 
-        let content_length = match headers.fields.get("content-length") {
-            Some(value) => match value.parse::<usize>() {
-                Ok(n) => n,
+            match read_chunked_body(
+                &mut stream,
+                &mut buffer,
+                body_start,
+                max_body_size,
+                read_timeout_sec,
+            )
+            .await
+            {
+                Ok(result) => result,
                 Err(_) => {
-                    Response::bad_request().write_to_stream(&mut stream).await;
+                    let _ = Response::bad_request()
+                        .write_to_stream(write_timeout_sec, &mut stream)
+                        .await;
                     return;
                 }
-            },
-            None => 0,
-        };
+            }
+        } else {
+            let content_length = match headers.fields.get("content-length") {
+                Some(value) => match value.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let _ = Response::bad_request()
+                            .write_to_stream(write_timeout_sec, &mut stream)
+                            .await;
+                        return;
+                    }
+                },
+                None => 0,
+            };
 
-        let (body, leftover) = match read_content_length_body(
-            &mut stream,
-            &mut buffer,
-            body_start,
-            content_length,
-            max_body_size,
-            read_timeout_sec,
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => {
-                Response::bad_request().write_to_stream(&mut stream).await;
-                return;
+            match read_content_length_body(
+                &mut stream,
+                &mut buffer,
+                body_start,
+                content_length,
+                max_body_size,
+                read_timeout_sec,
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => {
+                    let _ = Response::bad_request()
+                        .write_to_stream(write_timeout_sec, &mut stream)
+                        .await;
+                    return;
+                }
             }
         };
 
         let request = match Request::from_headers(headers, body, (*state).clone(), peer_addr.ip()) {
             Some(request) => request,
             None => {
-                Response::bad_request().write_to_stream(&mut stream).await;
+                let _ = Response::bad_request()
+                    .write_to_stream(write_timeout_sec, &mut stream)
+                    .await;
                 return;
             }
         };
@@ -117,7 +150,7 @@ pub async fn handle_client(
                             handler(req).await
                         })
                     }
-                    None => Box::pin(async { Response::not_found() }),
+                    None => Box::pin(async move { Response::not_found() }),
                 }
             },
         );
@@ -126,7 +159,14 @@ pub async fn handle_client(
             .run(request)
             .await;
 
-        response.write_to_stream(&mut stream).await;
+        if response
+            .write_to_stream(write_timeout_sec, &mut stream)
+            .await
+            .is_err()
+        {
+            return;
+        }
+
         request_count += 1;
         buffer = leftover;
 
