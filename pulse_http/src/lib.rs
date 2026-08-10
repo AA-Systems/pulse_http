@@ -21,12 +21,11 @@
 //!
 //! # Current scope
 //!
-//! Included: keep-alive, `Content-Length` bodies, routing, middleware, JSON,
-//! url-encoded forms, typed state, rate limits, CORS, read/write timeouts,
-//! graceful shutdown.
+//! Included: keep-alive, `Content-Length` and chunked request bodies, routing,
+//! middleware, JSON, url-encoded forms, typed state, rate limits, CORS,
+//! read/write timeouts, graceful shutdown.
 //!
-//! Not yet: chunked transfer encoding, multipart uploads, streaming responses,
-//! fuzz tests, and benchmarks.
+//! Not yet: multipart uploads, streaming responses, fuzz tests, and benchmarks.
 
 pub mod constants;
 pub mod errors;

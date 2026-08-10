@@ -4,6 +4,7 @@ pub mod parse_request_line;
 pub mod parse_urlencoded;
 pub mod rate_limit_key;
 pub mod read_body;
+pub mod read_chunked_body;
 pub mod read_headers;
 pub mod read_with_timeout;
 pub mod reason_phrase;

@@ -2,7 +2,9 @@ use crate::{
     constants::MAX_REQUESTS_PER_CONNECTION,
     errors::ReadHeadersError,
     helpers::{
-        read_body::read_content_length_body, read_headers::read_headers,
+        read_body::read_content_length_body,
+        read_chunked_body::{is_chunked_transfer_encoding, read_chunked_body},
+        read_headers::read_headers,
         should_keep_alive::should_keep_alive,
     },
     middleware::{Middleware, Next},
@@ -62,42 +64,62 @@ pub async fn handle_client(
             }
         };
 
-        if headers.fields.contains_key("transfer-encoding") {
-            let _ = Response::bad_request()
-                .write_to_stream(write_timeout_sec, &mut stream)
-                .await;
-            return;
-        }
+        let (body, leftover) = if let Some(te) = headers.fields.get("transfer-encoding") {
+            if !is_chunked_transfer_encoding(te) {
+                let _ = Response::bad_request()
+                    .write_to_stream(write_timeout_sec, &mut stream)
+                    .await;
+                return;
+            }
 
-        let content_length = match headers.fields.get("content-length") {
-            Some(value) => match value.parse::<usize>() {
-                Ok(n) => n,
+            match read_chunked_body(
+                &mut stream,
+                &mut buffer,
+                body_start,
+                max_body_size,
+                read_timeout_sec,
+            )
+            .await
+            {
+                Ok(result) => result,
                 Err(_) => {
                     let _ = Response::bad_request()
                         .write_to_stream(write_timeout_sec, &mut stream)
                         .await;
                     return;
                 }
-            },
-            None => 0,
-        };
+            }
+        } else {
+            let content_length = match headers.fields.get("content-length") {
+                Some(value) => match value.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(_) => {
+                        let _ = Response::bad_request()
+                            .write_to_stream(write_timeout_sec, &mut stream)
+                            .await;
+                        return;
+                    }
+                },
+                None => 0,
+            };
 
-        let (body, leftover) = match read_content_length_body(
-            &mut stream,
-            &mut buffer,
-            body_start,
-            content_length,
-            max_body_size,
-            read_timeout_sec,
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(_) => {
-                let _ = Response::bad_request()
-                    .write_to_stream(write_timeout_sec, &mut stream)
-                    .await;
-                return;
+            match read_content_length_body(
+                &mut stream,
+                &mut buffer,
+                body_start,
+                content_length,
+                max_body_size,
+                read_timeout_sec,
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => {
+                    let _ = Response::bad_request()
+                        .write_to_stream(write_timeout_sec, &mut stream)
+                        .await;
+                    return;
+                }
             }
         };
 
