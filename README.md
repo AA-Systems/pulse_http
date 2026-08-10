@@ -9,7 +9,7 @@ Async HTTP/1.1 framework for Rust, built on [Tokio](https://tokio.rs) from raw T
 
 ```toml
 [dependencies]
-pulse_http = "0.1"
+pulse_http = "0.2"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -91,9 +91,24 @@ Server::bind("127.0.0.1:3000".into())
     .await;
 ```
 
-## Not yet (later)
+## Benchmarks
 
-Fuzz tests, benchmarks.
+Micro-benchmarks via [Criterion](https://github.com/bheisler/criterion.rs) (release mode). Numbers below are from one run on Apple Silicon (Aug 2026) — treat as relative, not absolute.
+
+| Bench                | Median time |
+| -------------------- | ----------- |
+| `parse_headers`      | ~471 ns     |
+| `parse_urlencoded`   | ~326 ns     |
+| `parse_multipart`    | ~872 ns     |
+| `router_match_param` | ~222 ns     |
+
+Reproduce:
+
+```bash
+cargo bench -p pulse_http --bench micro
+```
+
+HTML reports (local): `pulse_http/target/criterion/*/report/index.html`
 
 ## License
 

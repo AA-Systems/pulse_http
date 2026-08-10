@@ -12,5 +12,4 @@ pub mod reason_phrase;
 pub mod should_keep_alive;
 pub mod split_path_and_query;
 pub mod split_segments;
-pub mod stream_file;
 pub mod write_with_timeout;
