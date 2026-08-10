@@ -48,7 +48,7 @@ Ctrl+C triggers graceful shutdown (stop accept → drain connections → grace a
 - Read and write timeouts (slow clients close the connection)
 - Trie router (static + `:param`), query params
 - Async middleware (request id, logging, CORS, security headers, panic catch)
-- JSON + `application/x-www-form-urlencoded`
+- JSON + `application/x-www-form-urlencoded` + `multipart/form-data`
 - Typed app `State`
 - Per-route token-bucket rate limits
 - Configurable max connections, max body size, read/write timeouts
@@ -92,7 +92,7 @@ Server::bind("127.0.0.1:3000".into())
 
 ## Not yet (later)
 
-Multipart uploads, streaming responses, fuzz tests, benchmarks.
+Streaming responses, fuzz tests, benchmarks.
 
 ## License
 

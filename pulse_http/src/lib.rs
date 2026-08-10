@@ -22,10 +22,10 @@
 //! # Current scope
 //!
 //! Included: keep-alive, `Content-Length` and chunked request bodies, routing,
-//! middleware, JSON, url-encoded forms, typed state, rate limits, CORS,
-//! read/write timeouts, graceful shutdown.
+//! middleware, JSON, url-encoded forms, multipart form-data, typed state,
+//! rate limits, CORS, read/write timeouts, graceful shutdown.
 //!
-//! Not yet: multipart uploads, streaming responses, fuzz tests, and benchmarks.
+//! Not yet: streaming responses, fuzz tests, and benchmarks.
 
 pub mod constants;
 pub mod errors;
@@ -39,7 +39,8 @@ pub mod router;
 pub mod server;
 pub mod state;
 
-pub use errors::FormError;
+pub use errors::{FormError, MultipartError};
+pub use helpers::parse_multipart::{Multipart, MultipartFile};
 pub use middleware::{CatchPanic, Cors, Middleware, RequestId, RequestLogger, SecurityHeaders};
 pub use rate_limit::{Limit, RateLimit};
 pub use request::{Method, Request};

@@ -1,5 +1,6 @@
 pub mod find_subslice;
 pub mod parse_header_line;
+pub mod parse_multipart;
 pub mod parse_request_line;
 pub mod parse_urlencoded;
 pub mod rate_limit_key;
